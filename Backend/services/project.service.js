@@ -1,4 +1,5 @@
 import projectModel from '../models/project.model.js';
+import mongoose from 'mongoose';
 
 export const createProject = async ({
     name, userId
@@ -17,10 +18,10 @@ export const createProject = async ({
             users: [ userId ]
         });
     } catch (err) {
-        if (error.code === 11000) {
+        if (err.code === 11000) {
             throw new Error('Project name already exists');
         }
-        throw error;
+        throw err;
     }
     return project;
 }
@@ -68,7 +69,7 @@ export const addUserToProject = async ({ projectId, users, userId }) => {
     })
 
     if (!project) {
-        throw new Error('User not belong ti this project')
+        throw new Error('User does not belong to this project')
     }
 
     const updatedProject = await projectModel.findOneAndUpdate({
