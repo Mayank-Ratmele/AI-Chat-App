@@ -1,6 +1,8 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useContext, createRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import axios from '../config/axios';
+import axios from '../config/axios.js';
+import { initializeSocket, receiveMessage, sendMessage } from '../config/socket.js';
+import { UserContext } from '../context/user.context.jsx';
 
 const Project = () => {
 	const loc = useLocation();
@@ -14,6 +16,10 @@ const Project = () => {
 
 	const [users, setUsers] = useState([]);
 	const [project, setProject] = useState(loc.state.project);
+
+	const [message, setMessage] = useState('');
+	const { user } = useContext(UserContext);
+	const messageBox = createRef();
 
 	// --- Helpers ---
 	const toStr = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v));
@@ -32,7 +38,23 @@ const Project = () => {
 		})
 	}
 
+	function messageSend() {
+		sendMessage('project-message', {
+			message,
+			sender: user
+		})
+		appendOutgoingMessages(message);
+		setMessage('');
+	}
+
 	useEffect(() => {
+
+		initializeSocket(project._id);
+
+		receiveMessage('project-message', data => {
+			console.log(data);
+			appendIncomingMessages(data);
+		})
 
 		axios.get(`/projects/get-project/${loc.state.project._id}`).then(res => {
 			setProject(res.data.project);
@@ -66,6 +88,36 @@ const Project = () => {
 		});
 	}, []);
 
+	function appendIncomingMessages(messageObject) {
+		const messageBox = document.querySelector('.message-box');
+
+		const message = document.createElement('div');
+		message.classList.add('message', 'max-w-80', 'flex', 'flex-col', 'p-2', 'bg-slate-50', 'w-fit', 'rounded-md');
+		message.innerHTML = `
+				<small class='opacity-65 test-xs'>${messageObject.sender.email}</small>
+				<p class='text-sm'>${messageObject.message}</p>
+				`
+		messageBox.appendChild(message);
+		scrollToBottom();
+	}
+
+	function appendOutgoingMessages(message) {
+		const messageBox = document.querySelector('.message-box');
+
+		const newMessage = document.createElement('div');
+		newMessage.classList.add('ml-auto', 'max-w-80', 'message', 'flex', 'flex-col', 'p-2', 'bg-slate-50', 'w-fit', 'rounded-md');
+		newMessage.innerHTML = `
+				<small class='opacity-65 test-xs'>${user.email}</small>
+				<p class='text-sm'>${message}</p>
+		`
+		messageBox.appendChild(newMessage);
+		scrollToBottom();
+	}
+
+	function scrollToBottom() {
+		messageBox.current.scrollTop = messageBox.current.scrollHeight;
+	}
+
 	// Fallback random id if backend gives none
 	function cryptoRandomId() {
 		// not cryptographically secure, just unique enough for UI keys
@@ -94,12 +146,12 @@ const Project = () => {
 		setSelectedUserIds(new Set());
 	}, []);
 
-	const handleAddSelected = useCallback(() => {
-		const ids = Array.from(selectedUserIds);
-		// TODO: send `ids` to your API, e.g.:
-		console.log('Added users:', ids);
-		setIsUserModalOpen(false);
-	}, [selectedUserIds]);
+	// const handleAddSelected = useCallback(() => {
+	// 	const ids = Array.from(selectedUserIds);
+	// 	// TODO: send `ids` to your API, e.g.:
+	// 	console.log('Added users:', ids);
+	// 	setIsUserModalOpen(false);
+	// }, [selectedUserIds]);
 
 	const selectedCount = selectedUserIds.size;
 
@@ -125,9 +177,9 @@ const Project = () => {
 			</header>
 
 			{/* Conversation area */}
-			<div className="conversation-area flex flex-col flex-grow">
-			<div className="message-box flex-grow flex flex-col p-4 gap-1.5 overflow-y-auto">
-				<div className="incoming message max-w-80 flex flex-col p-2 bg-slate-50 w-fit rounded-md">
+			<div className="conversation-area py-2 flex flex-col flex-grow overflow-y-auto scrollbar-hide">
+			<div ref={messageBox} className="message-box flex-grow flex flex-col p-4 gap-1.5 overflow-y-auto overflow-y-hide">
+				{/* <div className="incoming message max-w-80 flex flex-col p-2 bg-slate-50 w-fit rounded-md">
 				<small className="opacity-60 text-xs">example@test.com</small>
 				<p className="text-sm">
 					Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde, magni ab neque ducimus, placeat blanditiis nesciunt, accusantium quasi non hic eos voluptates cumque omnis dolorem explicabo reprehenderit tenetur nostrum culpa?
@@ -136,7 +188,7 @@ const Project = () => {
 				<div className="ml-auto max-w-80 message flex flex-col p-2 bg-slate-50 w-fit rounded-md">
 				<small className="opacity-60 text-xs">example@test.com</small>
 				<p className="text-sm">hello</p>
-				</div>
+				</div> */}
 
 				{selectedCount > 0 && (
 				<div className="mt-3 text-xs text-slate-600">
@@ -151,12 +203,14 @@ const Project = () => {
 			{/* Input pinned to bottom */}
 			<div className="inputField w-full flex p-3 bg-slate-100">
 				<input
+				value={message}
+				onChange={(e) => setMessage(e.target.value)}
 				style={{ backgroundColor: 'rgba(255, 255, 255, 0.35)' }}
 				className="py-2 pl-2 w-full border rounded-md outline-none"
 				type="text"
 				placeholder="Enter message"
 				/>
-				<button className="cursor-pointer ml-3 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+				<button onClick={messageSend} className="cursor-pointer ml-3 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
 				<i className="ri-send-plane-fill"></i>
 				</button>
 			</div>
