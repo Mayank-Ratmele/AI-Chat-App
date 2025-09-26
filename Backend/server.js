@@ -5,6 +5,7 @@ import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import mongoose from "mongoose";
 import projectModel from "./models/project.model.js";
+import { generateResult } from "./services/gemini.service.js";
 
 const port = process.env.PORT || 3000;
 
@@ -21,14 +22,8 @@ io.use(async (socket, next) => {
         const token = socket.handshake.auth?.token || socket.handshake.headers.authorization?.split(' ')[1];
         const projectId = socket.handshake.query.projectId;
 
-        if (!mongoose.Types.ObjectId.isValid(projectId)) {
-            return next(new Error('Invalid projectId'));
-        }
-
-        socket.project = await projectModel.findById(projectId);
-        
         if (!token) {
-            return next(new Error('Authentication error: token does not match'))
+            return next(new Error('Authentication error: token required'))
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -37,6 +32,16 @@ io.use(async (socket, next) => {
             return next(new Error('Authentication error'))
         }
 
+        if (!projectId || !mongoose.Types.ObjectId.isValid(projectId)) {
+            return next(new Error('Invalid projectId'));
+        }
+
+        const project = await projectModel.findById(projectId);
+        if (!project) {
+            return next(new Error('Project not found'));
+        }
+
+        socket.project = project;
         socket.user = decoded;
         next();
 
@@ -51,16 +56,45 @@ io.on('connection', socket => {
     console.log('a user connected!');
 
     socket.join(socket.roomId);
-    socket.on('project-message', data => {
+    socket.on('project-message', async data => {
+        const message = data.message;
+        const aiIsPresent = message.includes('@ai');
 
-        console.log(data);
+        if (aiIsPresent) {
+            const prompt = message.replace('@ai', '').trim();
 
+            try {
+                const aiResponse = await generateResult(prompt);
+                console.log(aiResponse);
+
+                io.to(socket.roomId).emit('project-message', {
+                    message: aiResponse,
+                    sender: {
+                        _id: 'ai',
+                        email: 'AI Assistant'
+                    }
+                });
+            } catch (error) {
+                console.error('AI generation error:', error);
+                io.to(socket.roomId).emit('project-message', {
+                    message: 'Sorry, I encountered an error while processing your request.',
+                    sender: {
+                        _id: 'ai',
+                        email: 'AI Assistant'
+                    }
+                });
+            }
+
+            return;
+        }
+        
+        // Broadcast regular message to all other users in the room
         socket.broadcast.to(socket.roomId).emit('project-message', data);
     })
     socket.on('event', data => { /* … */ });
     socket.on('disconnect', () => { 
         console.log('user-disconnected');
-        socket.leave(socket.roomId);
+        socket.leave(socket.roomId); 
     });
 })
 // server.listen(3000);
