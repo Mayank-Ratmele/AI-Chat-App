@@ -56,16 +56,18 @@ io.on('connection', socket => {
     console.log('a user connected!');
 
     socket.join(socket.roomId);
-    socket.on('project-message', async data => {
+    socket.on('project-message', async (data) => {
         const message = data.message;
         const aiIsPresent = message.includes('@ai');
+        // Broadcast regular message to all other users in the room
+        socket.broadcast.to(socket.roomId).emit('project-message', data);
 
         if (aiIsPresent) {
-            const prompt = message.replace('@ai', '').trim();
+            const prompt = message.replace('@ai', '');
 
             try {
                 const aiResponse = await generateResult(prompt);
-                console.log(aiResponse);
+                // console.log(aiResponse);
 
                 io.to(socket.roomId).emit('project-message', {
                     message: aiResponse,
@@ -75,7 +77,7 @@ io.on('connection', socket => {
                     }
                 });
             } catch (error) {
-                console.error('AI generation error:', error);
+                console.log('AI generation error:', error);
                 io.to(socket.roomId).emit('project-message', {
                     message: 'Sorry, I encountered an error while processing your request.',
                     sender: {
@@ -88,8 +90,7 @@ io.on('connection', socket => {
             return;
         }
         
-        // Broadcast regular message to all other users in the room
-        socket.broadcast.to(socket.roomId).emit('project-message', data);
+
     })
     socket.on('event', data => { /* … */ });
     socket.on('disconnect', () => { 

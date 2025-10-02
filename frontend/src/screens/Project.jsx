@@ -1,126 +1,580 @@
-import React, { useState, useMemo, useCallback, useEffect, useContext, createRef } from 'react';
+// import React, { useState, useMemo, useCallback, useEffect, useContext, useRef } from 'react';
+// import { useLocation } from 'react-router-dom';
+// import Markdown from 'markdown-to-jsx';
+// import axios from '../config/axios.js';
+// import { initializeSocket, receiveMessage, sendMessage } from '../config/socket.js';
+// import { UserContext } from '../context/user.context.jsx';
+
+// // Syntax highlighting for AI code blocks
+// import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+// import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+
+// // Reusable Markdown renderers so AI messages get VS Code-like code highlighting
+// function CodeBlock({ className, children }) {
+// 	const languageMatch = /language-(\w+)/.exec(className || '');
+// 	const language = languageMatch ? languageMatch[1] : undefined;
+// 	const raw = Array.isArray(children) ? children.join('') : String(children ?? '');
+
+// 	if (language) {
+// 		return (
+// 		<SyntaxHighlighter
+// 			language={language || 'javascript'}
+// 			style={vscDarkPlus}
+// 			PreTag="div"
+// 			wrapLongLines
+// 			showLineNumbers={false}
+// 			customStyle={{ margin: 0, background: 'transparent' }}
+// 			codeTagProps={{ style: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' } }}
+// 		>
+// 			{raw}
+// 		</SyntaxHighlighter>
+// 		);
+// 	}
+
+// 	// Inline or unknown language code — keep it readable on dark bg
+// 	return (
+// 		<code
+// 		className="px-1 py-0.5 rounded bg-white/10 text-white/90"
+// 		style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' }}
+// 		>
+// 		{children}
+// 		</code>
+// 	);
+// 	}
+
+// 	function PreBlock({ children }) {
+// 	// markdown-to-jsx wraps fenced code as <pre><code class="language-...">...</code></pre>
+// 	// We intercept <pre> and let <code> renderer above decide styling.
+// 	return (
+// 		<pre className="m-0 overflow-x-auto rounded-lg bg-black/30 p-3">
+// 		{children}
+// 		</pre>
+// 	);
+// 	}
+
+// 	const aiMarkdownOptions = {
+// 	forceBlock: true,
+// 	overrides: {
+// 		pre: { component: PreBlock },
+// 		code: { component: CodeBlock },
+// 		// Optional: headings, lists, etc., inherit white text on dark bg
+// 		h1: { props: { className: 'text-white font-semibold text-xl mb-2' } },
+// 		h2: { props: { className: 'text-white font-semibold text-lg mb-2' } },
+// 		p: { props: { className: 'text-white/95 leading-relaxed' } },
+// 		li: { props: { className: 'text-white/95' } },
+// 		a: { props: { className: 'text-blue-300 underline hover:text-blue-200' } },
+// 	},
+// 	};
+
+// 	const Project = () => {
+// 	const loc = useLocation();
+
+// 	const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
+// 	const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+
+// 	// Messages now live in React state
+// 	const [messages, setMessages] = useState([]);
+
+// 	// Multi-select
+// 	const [selectedUserIds, setSelectedUserIds] = useState(new Set());
+// 	const [searchQuery, setSearchQuery] = useState('');
+
+// 	const [users, setUsers] = useState([]);
+// 	const [project, setProject] = useState(loc.state.project);
+
+// 	const [message, setMessage] = useState('');
+// 	const { user } = useContext(UserContext);
+// 	const messageBoxRef = useRef(null);
+
+// 	// --- Helpers ---
+// 	const toStr = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v));
+// 	const lower = (v) => toStr(v).toLowerCase();
+
+// 	function addCollaborators() {
+// 		axios
+// 		.put('/projects/add-user', {
+// 			projectId: loc.state.project._id,
+// 			users: Array.from(selectedUserIds),
+// 		})
+// 		.then((res) => {
+// 			console.log(res.data);
+// 			setIsUserModalOpen(false);
+// 		})
+// 		.catch((err) => {
+// 			console.log(err);
+// 			setIsUserModalOpen(false);
+// 		});
+// 	}
+
+// 	function messageSend() {
+// 		const text = toStr(message).trim();
+// 		if (!text) return;
+
+// 		// Broadcast over socket
+// 		sendMessage('project-message', {
+// 		message: text,
+// 		sender: user,
+// 		});
+
+// 		// Append locally via state (no innerHTML)
+// 		appendOutgoingMessage(text);
+// 		setMessage('');
+// 	}
+
+// 	useEffect(() => {
+// 		initializeSocket(project._id);
+
+// 		receiveMessage('project-message', (data) => {
+// 		console.log('incoming:', data);
+// 		appendIncomingMessage(data);
+// 		});
+
+// 		axios
+// 		.get(`/projects/get-project/${loc.state.project._id}`)
+// 		.then((res) => {
+// 			setProject(res.data.project);
+// 		})
+// 		.catch((err) => {
+// 			console.log(err);
+// 		});
+
+// 		axios
+// 		.get('/users/all')
+// 		.then((res) => {
+// 			const raw = res?.data?.users;
+// 			const list = Array.isArray(raw) ? raw : [];
+// 			// Normalize user objects to avoid undefined fields later
+// 			const normalized = list.map((u) => {
+// 			const id = u?._id ?? u?.id ?? u?.uuid ?? u?.email ?? cryptoRandomId();
+// 			const nameCandidate =
+// 				u?.name ??
+// 				u?.username ??
+// 				[u?.firstName, u?.lastName].filter(Boolean).join(' ') ??
+// 				'';
+// 			const email = toStr(u?.email);
+// 			const name = nameCandidate || (email ? email.split('@')[0] : 'Unknown');
+// 			return { _id: id, name: toStr(name), email };
+// 			});
+// 			setUsers(normalized);
+// 		})
+// 		.catch((err) => {
+// 			console.log(err);
+// 			setUsers([]); // keep it safe
+// 		});
+// 	}, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+// 	// Append helpers now only touch React state
+// 	function appendIncomingMessage(messageObject) {
+// 		const normalized = {
+// 		_localId: cryptoRandomId(),
+// 		message: toStr(messageObject?.message ?? ''),
+// 		sender: messageObject?.sender ?? { _id: 'unknown', email: 'unknown' },
+// 		createdAt: Date.now(),
+// 		direction: 'incoming',
+// 		};
+// 		setMessages((prev) => [...prev, normalized]);
+// 	}
+
+// 	function appendOutgoingMessage(text) {
+// 		const normalized = {
+// 		_localId: cryptoRandomId(),
+// 		message: toStr(text ?? ''),
+// 		sender: user ?? { _id: 'me', email: 'me' },
+// 		createdAt: Date.now(),
+// 		direction: 'outgoing',
+// 		};
+// 		setMessages((prev) => [...prev, normalized]);
+// 	}
+
+// 	// Auto-scroll on new messages
+// 	useEffect(() => {
+// 		if (!messageBoxRef.current) return;
+// 		const el = messageBoxRef.current;
+// 		el.scrollTop = el.scrollHeight;
+// 	}, [messages]);
+
+// 	// Fallback random id if backend gives none
+// 	function cryptoRandomId() {
+// 		return 'u_' + Math.random().toString(36).slice(2, 10);
+// 	}
+
+// 	const filteredUsers = useMemo(() => {
+// 		if (!Array.isArray(users)) return [];
+// 		const q = lower(searchQuery).trim();
+// 		if (!q) return users;
+// 		return users.filter((u) => lower(u?.name).includes(q) || lower(u?.email).includes(q));
+// 	}, [users, searchQuery]);
+
+// 	const toggleSelectUser = useCallback((id) => {
+// 		setSelectedUserIds((prev) => {
+// 		const next = new Set(prev);
+// 		next.has(id) ? next.delete(id) : next.add(id);
+// 		return next;
+// 		});
+// 	}, []);
+
+// 	const deselectAll = useCallback(() => {
+// 		setSelectedUserIds(new Set());
+// 	}, []);
+
+// 	const selectedCount = selectedUserIds.size;
+
+// 	return (
+// 		<main className="h-screen w-screen flex">
+// 		<section className="left relative flex flex-col h-full w-md bg-gray-200">
+// 			{/* Header */}
+// 			<header className="flex justify-between items-center p-3 px-4 w-full bg-slate-100">
+// 			<button className="p-2 cursor-pointer flex gap-2 items-center" onClick={() => setIsUserModalOpen(true)}>
+// 				<i className="ri-user-add-fill"></i>
+// 				<p className="text-sm sm:text-base">Add Collaborators</p>
+// 			</button>
+
+// 			<button onClick={() => setIsSidePanelOpen(!isSidePanelOpen)} className="p-2 cursor-pointer">
+// 				<i className="ri-team-fill"></i>
+// 			</button>
+// 			</header>
+
+// 			{/* Conversation area */}
+// 			<div className="conversation-area py-2 flex flex-col flex-grow overflow-y-auto scrollbar-hide">
+// 			<div
+// 				ref={messageBoxRef}
+// 				className="message-box flex-grow flex flex-col p-4 gap-1.5 overflow-y-auto overflow-y-hide"
+// 			>
+// 				{/* Render message list from state */}
+// 				{messages.map((m) => {
+// 				const isOutgoing = m.direction === 'outgoing' || m?.sender?._id === user?._id;
+// 				const isAI = m?.sender?._id === 'ai';
+
+// 				// Container styles: AI gets dark background, white text; others stay light
+// 				const containerClasses = [
+// 					isOutgoing ? 'ml-auto' : '',
+// 					'max-w-80 message flex flex-col p-2 w-fit rounded-md',
+// 					isAI ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-900',
+// 				].join(' ');
+
+// 				const senderTextClass = isAI ? 'opacity-75 text-[11px] text-slate-200' : 'opacity-65 text-[11px] text-slate-600';
+
+// 				return (
+// 					<div key={m._localId} className={containerClasses}>
+// 					<small className={senderTextClass}>{m?.sender?.email}</small>
+// 					<div className={`text-sm overflow-auto scrollbar-hide break-words whitespace-pre-wrap max-w-80 rounded-sm`}>
+// 						{isAI ? (
+// 						<Markdown options={aiMarkdownOptions}>{m.message}</Markdown>
+// 						) : (
+// 						m.message
+// 						)}
+// 					</div>
+// 					</div>
+// 				);
+// 				})}
+
+// 				{selectedCount > 0 && (
+// 				<div className="mt-3 text-xs text-slate-600">
+// 					Selected user ids: <span className="font-semibold">{Array.from(selectedUserIds).join(', ')}</span>
+// 				</div>
+// 				)}
+// 			</div>
+
+// 			{/* Input pinned to bottom */}
+// 			<div className="inputField w-full flex p-3 bg-slate-100">
+// 				<input
+// 				value={message}
+// 				onChange={(e) => setMessage(e.target.value)}
+// 				onKeyDown={(e) => {
+// 					if (e.key === 'Enter' && !e.shiftKey) {
+// 					e.preventDefault();
+// 					messageSend();
+// 					}
+// 				}}
+// 				style={{ backgroundColor: 'rgba(255, 255, 255, 0.35)' }}
+// 				className="py-2 pl-2 w-full border rounded-md outline-none"
+// 				type="text"
+// 				placeholder="Enter message"
+// 				/>
+// 				<button onClick={messageSend} className="cursor-pointer ml-3 px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">
+// 				<i className="ri-send-plane-fill"></i>
+// 				</button>
+// 			</div>
+// 			</div>
+
+// 			{/* Slide-in side panel */}
+// 			<div
+// 			className={`sidePanel w-full h-full flex flex-col gap-2 bg-blue-100 absolute transition-transform duration-300 ease-out ${
+// 				isSidePanelOpen ? 'translate-x-0' : '-translate-x-full'
+// 			} top-0`}
+// 			>
+// 			<header className="flex justify-between items-center p-2 px-3 bg-slate-200">
+// 				<h1>
+// 				<strong>Collaborators:</strong>
+// 				</h1>
+// 				<button onClick={() => setIsSidePanelOpen(!isSidePanelOpen)} className="p-2 cursor-pointer">
+// 				<i className="ri-close-fill"></i>
+// 				</button>
+// 			</header>
+
+// 			<div className="users flex flex-col gap-2 px-2 pb-4 overflow-y-auto">
+// 				{project.users &&
+// 				project.users.map((u) => {
+// 					return (
+// 					<div key={u._id || u.email} className="user cursor-pointer hover:bg-slate-100 flex gap-3 items-center p-2 rounded-md">
+// 						<div className="relative rounded-full w-10 h-10 flex items-center justify-center bg-gray-200">
+// 						<i className="ri-user-4-line text-lg"></i>
+// 						</div>
+// 						<h1 className="font-semibold text-base sm:text-lg">{u.email}</h1>
+// 					</div>
+// 					);
+// 				})}
+// 			</div>
+// 			</div>
+// 		</section>
+
+// 		{/* Users Modal */}
+// 		{isUserModalOpen && (
+// 			<div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" aria-modal="true" role="dialog">
+// 			{/* Click outside to close */}
+// 			<div className="absolute inset-0" onClick={() => setIsUserModalOpen(false)} />
+// 			<div className="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-lg p-4 sm:p-6 max-h-[85vh] overflow-hidden flex flex-col">
+// 				<div className="flex items-center justify-between mb-3">
+// 				<h2 className="text-lg sm:text-xl font-semibold">Add Collaborators</h2>
+// 				<button className="p-2 rounded-md hover:bg-slate-100" onClick={() => setIsUserModalOpen(false)} aria-label="Close">
+// 					<i className="ri-close-line text-xl"></i>
+// 				</button>
+// 				</div>
+
+// 				{/* Search */}
+// 				<div className="mb-3 flex gap-2">
+// 				<input
+// 					className="w-full border rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
+// 					placeholder="Search users…"
+// 					value={searchQuery}
+// 					onChange={(e) => setSearchQuery(e.target.value)}
+// 				/>
+// 				{searchQuery && (
+// 					<button className="px-3 py-2 rounded-md border border-slate-300 hover:bg-slate-50" onClick={() => setSearchQuery('')} title="Clear search">
+// 					<i className="ri-close-circle-line"></i>
+// 					</button>
+// 				)}
+// 				</div>
+
+// 				{/* Users list */}
+// 				<div className="overflow-y-auto flex-1 pr-1">
+// 				{filteredUsers.length === 0 ? (
+// 					<div className="text-sm text-slate-500 p-3">No users found.</div>
+// 				) : (
+// 					<ul className="divide-y divide-slate-200">
+// 					{filteredUsers.map((u) => {
+// 						const isSelected = selectedUserIds.has(u._id);
+// 						return (
+// 						<li key={u._id}>
+// 							<button
+// 							onClick={() => toggleSelectUser(u._id)}
+// 							className={`w-full text-left flex items-center gap-3 p-3 hover:bg-slate-50 focus:outline-none rounded-md ${
+// 								isSelected ? 'bg-blue-50 ring-1 ring-blue-400' : ''
+// 							}`}
+// 							>
+// 							<div className="relative rounded-full w-10 h-10 flex items-center justify-center bg-gray-200 shrink-0">
+// 								<i className="ri-user-3-line text-lg"></i>
+// 							</div>
+// 							<div className="min-w-0 flex-1">
+// 								<p className="font-medium truncate">{u.name}</p>
+// 								<p className="text-xs text-slate-600 truncate">{u.email}</p>
+// 							</div>
+// 							<div
+// 								className={`w-5 h-5 rounded border flex items-center justify-center ${
+// 								isSelected ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300 bg-white'
+// 								}`}
+// 							>
+// 								{isSelected && <i className="ri-check-line text-sm leading-none" />}
+// 							</div>
+// 							</button>
+// 						</li>
+// 						);
+// 					})}
+// 					</ul>
+// 				)}
+// 				</div>
+
+// 				{/* Selected summary */}
+// 				<div className="mt-3 flex items-center justify-between text-sm">
+// 				<span className="text-slate-600">{selectedCount} selected</span>
+// 				{selectedCount > 0 && (
+// 					<div className="hidden sm:flex gap-2 flex-wrap max-w-[65%]">
+// 					{Array.from(selectedUserIds).map((id) => {
+// 						const u = users.find((x) => x._id === id);
+// 						if (!u) return null;
+// 						return (
+// 						<span key={id} className="px-2 py-1 rounded-full bg-slate-100 text-slate-700">
+// 							{u.name}
+// 						</span>
+// 						);
+// 					})}
+// 					</div>
+// 				)}
+// 				</div>
+
+// 				{/* Actions */}
+// 				<div className="mt-4 flex flex-wrap items-center justify-end gap-2">
+// 				<button className="px-4 py-2 rounded-md border border-slate-300 hover:bg-slate-50" onClick={() => setIsUserModalOpen(false)}>
+// 					Cancel
+// 				</button>
+
+// 				<button
+// 					className="px-4 py-2 rounded-md border border-rose-300 text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+// 					disabled={selectedCount === 0}
+// 					onClick={deselectAll}
+// 				>
+// 					Clear Selection
+// 				</button>
+
+// 				<button
+// 					className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+// 					disabled={selectedCount === 0}
+// 					onClick={addCollaborators}
+// 				>
+// 					Add Selected ({selectedCount})
+// 				</button>
+// 				</div>
+// 			</div>
+// 			</div>
+// 		)}
+// 		</main>
+// 	);
+// };
+
+// export default Project;
+
+
+
+
+import React, { useState, useMemo, useCallback, useEffect, useContext, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
+import Markdown from 'markdown-to-jsx';
 import axios from '../config/axios.js';
 import { initializeSocket, receiveMessage, sendMessage } from '../config/socket.js';
 import { UserContext } from '../context/user.context.jsx';
 
-const Project = () => {
-	const loc = useLocation();
+// Syntax highlighting for AI code blocks
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
+// Reusable Markdown renderers so AI messages get VS Code-like code highlighting
+function CodeBlock({ className, children }) {
+	const languageMatch = /language-(\w+)/.exec(className || '');
+	const language = languageMatch ? languageMatch[1] : '';
+	const raw = Array.isArray(children) ? children.join('') : String(children ?? '');
+
+	return (
+		<SyntaxHighlighter
+		language={language || 'javascript'}
+		style={vscDarkPlus}
+		PreTag="div"
+		wrapLongLines
+		showLineNumbers={false}
+		customStyle={{ margin: 0, padding: '8px', borderRadius: '6px', background: '#1e1e1e' }}
+		codeTagProps={{ style: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace' } }}
+		>
+		{raw}
+		</SyntaxHighlighter>
+	);
+	}
+
+	const aiMarkdownOptions = {
+	forceBlock: true,
+	overrides: {
+		code: { component: CodeBlock },
+		h1: { props: { className: 'text-white font-semibold text-xl mb-2' } },
+		h2: { props: { className: 'text-white font-semibold text-lg mb-2' } },
+		p: { props: { className: 'text-white/95 leading-relaxed' } },
+		li: { props: { className: 'text-white/95' } },
+		a: { props: { className: 'text-blue-300 underline hover:text-blue-200' } },
+	},
+	};
+
+	const Project = () => {
+	const loc = useLocation();
 	const [isSidePanelOpen, setIsSidePanelOpen] = useState(false);
 	const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-
-	// Multi-select
+	const [messages, setMessages] = useState([]);
 	const [selectedUserIds, setSelectedUserIds] = useState(new Set());
 	const [searchQuery, setSearchQuery] = useState('');
-
 	const [users, setUsers] = useState([]);
 	const [project, setProject] = useState(loc.state.project);
-
 	const [message, setMessage] = useState('');
 	const { user } = useContext(UserContext);
-	const messageBox = createRef();
+	const messageBoxRef = useRef(null);
 
-	// --- Helpers ---
 	const toStr = (v) => (typeof v === 'string' ? v : v == null ? '' : String(v));
 	const lower = (v) => toStr(v).toLowerCase();
 
 	function addCollaborators() {
-		axios.put('/projects/add-user', { 
+		axios
+		.put('/projects/add-user', {
 			projectId: loc.state.project._id,
-			users: Array.from(selectedUserIds)
-		}).then(res => {
-			console.log(res.data);
-			setIsUserModalOpen(false);
-		}).catch(err => {
-			console.log(err);
-			setIsUserModalOpen(false);
+			users: Array.from(selectedUserIds),
 		})
+		.then(() => setIsUserModalOpen(false))
+		.catch(() => setIsUserModalOpen(false));
 	}
 
 	function messageSend() {
-		sendMessage('project-message', {
-			message,
-			sender: user
-		})
-		appendOutgoingMessages(message);
+		const text = toStr(message).trim();
+		if (!text) return;
+		sendMessage('project-message', { message: text, sender: user });
+		appendOutgoingMessage(text);
 		setMessage('');
 	}
 
 	useEffect(() => {
-
 		initializeSocket(project._id);
+		receiveMessage('project-message', (data) => appendIncomingMessage(data));
 
-		receiveMessage('project-message', data => {
-			console.log(data);
-			appendIncomingMessages(data);
-		})
-
-		axios.get(`/projects/get-project/${loc.state.project._id}`).then(res => {
-			setProject(res.data.project);
-		}).catch(err => {
-			console.log(err);
-		})
-
+		axios.get(`/projects/get-project/${loc.state.project._id}`).then((res) => setProject(res.data.project));
 		axios
 		.get('/users/all')
 		.then((res) => {
 			const raw = res?.data?.users;
 			const list = Array.isArray(raw) ? raw : [];
-			// Normalize user objects to avoid undefined fields later
 			const normalized = list.map((u) => {
-			const id =
-				u?._id ?? u?.id ?? u?.uuid ?? u?.email ?? cryptoRandomId();
-			const nameCandidate =
-				u?.name ??
-				u?.username ??
-				[u?.firstName, u?.lastName].filter(Boolean).join(' ') ??
-				'';
+			const id = u?._id ?? u?.id ?? u?.uuid ?? u?.email ?? cryptoRandomId();
+			const nameCandidate = u?.name ?? u?.username ?? [u?.firstName, u?.lastName].filter(Boolean).join(' ');
 			const email = toStr(u?.email);
 			const name = nameCandidate || (email ? email.split('@')[0] : 'Unknown');
 			return { _id: id, name: toStr(name), email };
 			});
 			setUsers(normalized);
 		})
-		.catch((err) => {
-			console.log(err);
-			setUsers([]); // keep it safe
-		});
-	}, []);
+		.catch(() => setUsers([]));
+	}, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-	function appendIncomingMessages(messageObject) {
-		const messageBox = document.querySelector('.message-box');
-
-		const message = document.createElement('div');
-		message.classList.add('message', 'max-w-80', 'flex', 'flex-col', 'p-2', 'bg-slate-50', 'w-fit', 'rounded-md');
-		message.innerHTML = `
-				<small class='opacity-65 test-xs'>${messageObject.sender.email}</small>
-				<p class='text-sm'>${messageObject.message}</p>
-				`
-		messageBox.appendChild(message);
-		scrollToBottom();
+	function appendIncomingMessage(messageObject) {
+		const normalized = {
+		_localId: cryptoRandomId(),
+		message: toStr(messageObject?.message ?? ''),
+		sender: messageObject?.sender ?? { _id: 'unknown', email: 'unknown' },
+		createdAt: Date.now(),
+		direction: 'incoming',
+		};
+		setMessages((prev) => [...prev, normalized]);
 	}
 
-	function appendOutgoingMessages(message) {
-		const messageBox = document.querySelector('.message-box');
-
-		const newMessage = document.createElement('div');
-		newMessage.classList.add('ml-auto', 'max-w-80', 'message', 'flex', 'flex-col', 'p-2', 'bg-slate-50', 'w-fit', 'rounded-md');
-		newMessage.innerHTML = `
-				<small class='opacity-65 test-xs'>${user.email}</small>
-				<p class='text-sm'>${message}</p>
-		`
-		messageBox.appendChild(newMessage);
-		scrollToBottom();
+	function appendOutgoingMessage(text) {
+		const normalized = {
+		_localId: cryptoRandomId(),
+		message: toStr(text ?? ''),
+		sender: user ?? { _id: 'me', email: 'me' },
+		createdAt: Date.now(),
+		direction: 'outgoing',
+		};
+		setMessages((prev) => [...prev, normalized]);
 	}
 
-	function scrollToBottom() {
-		messageBox.current.scrollTop = messageBox.current.scrollHeight;
-	}
+	useEffect(() => {
+		if (!messageBoxRef.current) return;
+		const el = messageBoxRef.current;
+		el.scrollTop = el.scrollHeight;
+	}, [messages]);
 
-	// Fallback random id if backend gives none
 	function cryptoRandomId() {
-		// not cryptographically secure, just unique enough for UI keys
 		return 'u_' + Math.random().toString(36).slice(2, 10);
 	}
 
@@ -128,10 +582,7 @@ const Project = () => {
 		if (!Array.isArray(users)) return [];
 		const q = lower(searchQuery).trim();
 		if (!q) return users;
-		return users.filter((u) => {
-		// Safely compare without throwing
-		return lower(u?.name).includes(q) || lower(u?.email).includes(q);
-		});
+		return users.filter((u) => lower(u?.name).includes(q) || lower(u?.email).includes(q));
 	}, [users, searchQuery]);
 
 	const toggleSelectUser = useCallback((id) => {
@@ -142,17 +593,7 @@ const Project = () => {
 		});
 	}, []);
 
-	const deselectAll = useCallback(() => {
-		setSelectedUserIds(new Set());
-	}, []);
-
-	// const handleAddSelected = useCallback(() => {
-	// 	const ids = Array.from(selectedUserIds);
-	// 	// TODO: send `ids` to your API, e.g.:
-	// 	console.log('Added users:', ids);
-	// 	setIsUserModalOpen(false);
-	// }, [selectedUserIds]);
-
+	const deselectAll = useCallback(() => setSelectedUserIds(new Set()), []);
 	const selectedCount = selectedUserIds.size;
 
 	return (
@@ -160,51 +601,54 @@ const Project = () => {
 		<section className="left relative flex flex-col h-full w-md bg-gray-200">
 			{/* Header */}
 			<header className="flex justify-between items-center p-3 px-4 w-full bg-slate-100">
-			<button
-				className="p-2 cursor-pointer flex gap-2 items-center"
-				onClick={() => setIsUserModalOpen(true)}
-			>
+			<button className="p-2 cursor-pointer flex gap-2 items-center" onClick={() => setIsUserModalOpen(true)}>
 				<i className="ri-user-add-fill"></i>
 				<p className="text-sm sm:text-base">Add Collaborators</p>
 			</button>
-
-			<button
-				onClick={() => setIsSidePanelOpen(!isSidePanelOpen)}
-				className="p-2 cursor-pointer"
-			>
+			<button onClick={() => setIsSidePanelOpen(!isSidePanelOpen)} className="p-2 cursor-pointer">
 				<i className="ri-team-fill"></i>
 			</button>
 			</header>
 
 			{/* Conversation area */}
 			<div className="conversation-area py-2 flex flex-col flex-grow overflow-y-auto scrollbar-hide">
-			<div ref={messageBox} className="message-box flex-grow flex flex-col p-4 gap-1.5 overflow-y-auto overflow-y-hide">
-				{/* <div className="incoming message max-w-80 flex flex-col p-2 bg-slate-50 w-fit rounded-md">
-				<small className="opacity-60 text-xs">example@test.com</small>
-				<p className="text-sm">
-					Lorem ipsum dolor sit amet consectetur adipisicing elit. Unde, magni ab neque ducimus, placeat blanditiis nesciunt, accusantium quasi non hic eos voluptates cumque omnis dolorem explicabo reprehenderit tenetur nostrum culpa?
-				</p>
-				</div>
-				<div className="ml-auto max-w-80 message flex flex-col p-2 bg-slate-50 w-fit rounded-md">
-				<small className="opacity-60 text-xs">example@test.com</small>
-				<p className="text-sm">hello</p>
-				</div> */}
+			<div ref={messageBoxRef} className="message-box flex-grow flex flex-col p-4 gap-1.5 overflow-y-auto overflow-y-hide">
+				{messages.map((m) => {
+				const isOutgoing = m.direction === 'outgoing' || m?.sender?._id === user?._id;
+				const isAI = m?.sender?._id === 'ai';
+				const containerClasses = [
+					isOutgoing ? 'ml-auto' : '',
+					'max-w-80 message flex flex-col p-2 w-fit rounded-md',
+					isAI ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-900',
+				].join(' ');
+				const senderTextClass = isAI ? 'opacity-75 text-[11px] text-slate-200' : 'opacity-65 text-[11px] text-slate-600';
+				return (
+					<div key={m._localId} className={containerClasses}>
+					<small className={senderTextClass}>{m?.sender?.email}</small>
+					<div className="text-sm overflow-auto scrollbar-hide break-words whitespace-pre-wrap max-w-80 rounded-sm">
+						{isAI ? <Markdown options={aiMarkdownOptions}>{m.message}</Markdown> : m.message}
+					</div>
+					</div>
+				);
+				})}
 
 				{selectedCount > 0 && (
 				<div className="mt-3 text-xs text-slate-600">
-					Selected user ids:{' '}
-					<span className="font-semibold">
-					{Array.from(selectedUserIds).join(', ')}
-					</span>
+					Selected user ids: <span className="font-semibold">{Array.from(selectedUserIds).join(', ')}</span>
 				</div>
 				)}
 			</div>
 
-			{/* Input pinned to bottom */}
 			<div className="inputField w-full flex p-3 bg-slate-100">
 				<input
 				value={message}
 				onChange={(e) => setMessage(e.target.value)}
+				onKeyDown={(e) => {
+					if (e.key === 'Enter' && !e.shiftKey) {
+					e.preventDefault();
+					messageSend();
+					}
+				}}
 				style={{ backgroundColor: 'rgba(255, 255, 255, 0.35)' }}
 				className="py-2 pl-2 w-full border rounded-md outline-none"
 				type="text"
@@ -215,173 +659,9 @@ const Project = () => {
 				</button>
 			</div>
 			</div>
-
-			{/* Slide-in side panel */}
-			<div
-			className={`sidePanel w-full h-full flex flex-col gap-2 bg-blue-100 absolute transition-transform duration-300 ease-out ${
-				isSidePanelOpen ? 'translate-x-0' : '-translate-x-full'
-			} top-0`}
-			>
-			<header className="flex justify-between items-center p-2 px-3 bg-slate-200">
-				<h1> <strong>Collaborators:</strong></h1>
-				<button
-				onClick={() => setIsSidePanelOpen(!isSidePanelOpen)}
-				className="p-2 cursor-pointer"
-				>
-				<i className="ri-close-fill"></i>
-				</button>
-			</header>
-
-			<div className="users flex flex-col gap-2 px-2 pb-4 overflow-y-auto">
-				{project.users && project.users.map(user => {
-					return (<div className="user cursor-pointer hover:bg-slate-100 flex gap-3 items-center p-2 rounded-md">
-						<div className="relative rounded-full w-10 h-10 flex items-center justify-center bg-gray-200">
-							<i className="ri-user-4-line text-lg"></i>
-						</div>
-						<h1 className="font-semibold text-base sm:text-lg">{user.email}</h1>
-						</div>)
-				})}
-			</div>
-			</div>
 		</section>
-
-		{/* Users Modal */}
-		{isUserModalOpen && (
-			<div
-			className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50"
-			aria-modal="true"
-			role="dialog"
-			>
-			{/* Click outside to close */}
-			<div
-				className="absolute inset-0"
-				onClick={() => setIsUserModalOpen(false)}
-			/>
-			<div className="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-lg p-4 sm:p-6 max-h-[85vh] overflow-hidden flex flex-col">
-				<div className="flex items-center justify-between mb-3">
-				<h2 className="text-lg sm:text-xl font-semibold">Add Collaborators</h2>
-				<button
-					className="p-2 rounded-md hover:bg-slate-100"
-					onClick={() => setIsUserModalOpen(false)}
-					aria-label="Close"
-				>
-					<i className="ri-close-line text-xl"></i>
-				</button>
-				</div>
-
-				{/* Search */}
-				<div className="mb-3 flex gap-2">
-				<input
-					className="w-full border rounded-md px-3 py-2 outline-none focus:ring-2 focus:ring-blue-500"
-					placeholder="Search users…"
-					value={searchQuery}
-					onChange={(e) => setSearchQuery(e.target.value)}
-				/>
-				{searchQuery && (
-					<button
-					className="px-3 py-2 rounded-md border border-slate-300 hover:bg-slate-50"
-					onClick={() => setSearchQuery('')}
-					title="Clear search"
-					>
-					<i className="ri-close-circle-line"></i>
-					</button>
-				)}
-				</div>
-
-				{/* Users list */}
-				<div className="overflow-y-auto flex-1 pr-1">
-				{filteredUsers.length === 0 ? (
-					<div className="text-sm text-slate-500 p-3">No users found.</div>
-				) : (
-					<ul className="divide-y divide-slate-200">
-					{filteredUsers.map((u) => {
-						const isSelected = selectedUserIds.has(u._id);
-						return (
-						<li key={u._id}>
-							<button
-							onClick={() => toggleSelectUser(u._id)}
-							className={`w-full text-left flex items-center gap-3 p-3 hover:bg-slate-50 focus:outline-none rounded-md ${
-								isSelected ? 'bg-blue-50 ring-1 ring-blue-400' : ''
-							}`}
-							>
-							<div className="relative rounded-full w-10 h-10 flex items-center justify-center bg-gray-200 shrink-0">
-								<i className="ri-user-3-line text-lg"></i>
-							</div>
-							<div className="min-w-0 flex-1">
-								<p className="font-medium truncate">{u.name}</p>
-								<p className="text-xs text-slate-600 truncate">{u.email}</p>
-							</div>
-							<div
-								className={`w-5 h-5 rounded border flex items-center justify-center ${
-								isSelected
-									? 'border-blue-500 bg-blue-500 text-white'
-									: 'border-slate-300 bg-white'
-								}`}
-							>
-								{isSelected && (
-								<i className="ri-check-line text-sm leading-none" />
-								)}
-							</div>
-							</button>
-						</li>
-						);
-					})}
-					</ul>
-				)}
-				</div>
-
-				{/* Selected summary */}
-				<div className="mt-3 flex items-center justify-between text-sm">
-				<span className="text-slate-600">{selectedCount} selected</span>
-				{selectedCount > 0 && (
-					<div className="hidden sm:flex gap-2 flex-wrap max-w-[65%]">
-					{Array.from(selectedUserIds).map((id) => {
-						const u = users.find((x) => x._id === id);
-						if (!u) return null;
-						return (
-						<span
-							key={id}
-							className="px-2 py-1 rounded-full bg-slate-100 text-slate-700"
-						>
-							{u.name}
-						</span>
-						);
-					})}
-					</div>
-				)}
-				</div>
-
-				{/* Actions */}
-				<div className="mt-4 flex flex-wrap items-center justify-end gap-2">
-				<button
-					className="px-4 py-2 rounded-md border border-slate-300 hover:bg-slate-50"
-					onClick={() => setIsUserModalOpen(false)}
-				>
-					Cancel
-				</button>
-
-				<button
-					className="px-4 py-2 rounded-md border border-rose-300 text-rose-700 hover:bg-rose-50 disabled:opacity-50"
-					disabled={selectedCount === 0}
-					onClick={deselectAll}
-				>
-					Clear Selection
-				</button>
-
-				<button
-					className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-					disabled={selectedCount === 0}
-					onClick={addCollaborators}
-				>
-					Add Selected ({selectedCount})
-				</button>
-				</div>
-			</div>
-			</div>
-		)}
 		</main>
 	);
 };
 
 export default Project;
-

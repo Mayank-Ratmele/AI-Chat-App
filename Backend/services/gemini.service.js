@@ -57,7 +57,7 @@ const ai = new GoogleGenAI({
 export const generateResult = async (prompt) => {
 	try {
 		const result = await ai.models.generateContent({
-		model: "gemini-2.5-flash",
+		model: "gemini-1.5-flash",
 		systemInstruction: `You are an expert in MERN and Development. 
 		You have 10 years of experience. 
 		You always write modular code, break it into reusable parts, 
@@ -65,10 +65,11 @@ export const generateResult = async (prompt) => {
 		create files as needed, maintain existing functionality, 
 		and handle errors & edge cases gracefully. 
 		Your code is scalable and maintainable.`,
-		contents: [{ role: "sender", parts: [{ text: prompt }] }],
+		contents: `${prompt}`,
+		// contents: [{ role: "sender", parts: [{ text: prompt }] }],
 		});
 
-		return result.aiResponse.text();
+		return result.text;
 	} catch (error) {
 		console.error("Error generating AI response:", error);
 		throw error;
